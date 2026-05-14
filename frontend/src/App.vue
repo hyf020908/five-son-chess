@@ -25,6 +25,7 @@ const diagnostics = ref<Diagnostics | null>(null);
 const errorMessage = ref('');
 const gameStarted = ref(false);
 const gameResultDialogVisible = ref(false);
+const tokenLimitGameOverMessage = '对于思考模型，请适当增大max_tokens，防止下棋失败，本局游戏结束！';
 
 const modelConfig = reactive<ModelConfig>({
   base_url: 'http://127.0.0.1:11434/v1',
@@ -34,7 +35,7 @@ const modelConfig = reactive<ModelConfig>({
 
 const aiSettings = reactive<AiSettings>({
   temperature: 0.25,
-  max_tokens: 220,
+  max_tokens: 256,
   retry_count: 2,
 });
 
@@ -73,6 +74,10 @@ function validateConfig(): boolean {
   }
   if (!modelConfig.model_name.trim()) {
     errorMessage.value = 'Model name is required.';
+    return false;
+  }
+  if (!Number.isFinite(aiSettings.max_tokens) || aiSettings.max_tokens < 128) {
+    errorMessage.value = 'Max tokens must be at least 128.';
     return false;
   }
   return true;
@@ -119,7 +124,13 @@ async function onPlace(row: number, col: number) {
     aiSource.value = aiResponse.source;
     diagnostics.value = aiResponse.diagnostics;
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Unexpected request failure.';
+    const message = error instanceof Error ? error.message : 'Unexpected request failure.';
+    errorMessage.value = message;
+    if (message === tokenLimitGameOverMessage) {
+      gameStarted.value = false;
+      gameStatus.value = 'waiting';
+      gameResultDialogVisible.value = false;
+    }
   } finally {
     aiThinking.value = false;
   }

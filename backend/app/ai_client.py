@@ -14,6 +14,10 @@ class AiClientError(RuntimeError):
     """Raised when a model service request or response cannot be used."""
 
 
+class AiTokenLimitError(AiClientError):
+    """Raised when the model response was truncated by max_tokens."""
+
+
 def resolve_chat_completions_url(base_url: str) -> str:
     url = base_url.strip().rstrip("/")
     if url.endswith("/chat/completions"):
@@ -85,9 +89,13 @@ async def request_model_move(
 
     data = response.json()
     try:
-        content = data["choices"][0]["message"]["content"]
+        choice = data["choices"][0]
+        finish_reason = choice.get("finish_reason")
+        content = choice["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
         raise AiClientError("Model response did not include choices[0].message.content.") from exc
+    if finish_reason == "length":
+        raise AiTokenLimitError("Model response was truncated because max_tokens was too small.")
     if not isinstance(content, str) or not content.strip():
         raise AiClientError("Model response content is empty.")
     return content

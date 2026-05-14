@@ -33,7 +33,7 @@ class ModelConfig(BaseModel):
 
 class AiSettings(BaseModel):
     temperature: float = Field(default=DEFAULT_TEMPERATURE, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=DEFAULT_MAX_TOKENS, ge=32, le=4096)
+    max_tokens: int = Field(default=DEFAULT_MAX_TOKENS, ge=128, le=4096)
     retry_count: int = Field(default=DEFAULT_RETRY_COUNT, ge=0, le=4)
     reasoning_effort: Optional[str] = None
 

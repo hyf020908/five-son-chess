@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from .ai_client import AiClientError, parse_model_move, request_model_move
+from .ai_client import AiClientError, AiTokenLimitError, parse_model_move, request_model_move
 from .ai_prompt import build_ai_messages
 from .ai_strategy import CandidateMove, analyze_position, choose_fallback_candidate
 from .config import ALLOWED_ORIGINS, BLACK, WHITE
@@ -126,6 +126,11 @@ async def ai_move(request: AiMoveRequest) -> AiMoveResponse:
                     reason or selected.reason,
                 )
             except AiClientError as exc:
+                if isinstance(exc, AiTokenLimitError):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="对于思考模型，请适当增大max_tokens，防止下棋失败，本局游戏结束！",
+                    ) from exc
                 last_error = str(exc)
 
         fallback = choose_fallback_candidate(report)

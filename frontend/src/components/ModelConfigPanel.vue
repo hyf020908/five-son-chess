@@ -43,7 +43,7 @@ const emit = defineEmits<{
       </label>
       <label>
         <span>Max tokens</span>
-        <input v-model.number="aiSettings.max_tokens" type="number" min="32" max="4096" step="16" />
+        <input v-model.number="aiSettings.max_tokens" type="number" min="128" max="4096" step="16" />
       </label>
     </div>
 
