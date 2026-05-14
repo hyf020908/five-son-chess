@@ -1,17 +1,18 @@
 # Gomoku AI Arena
 
-Gomoku AI Arena is a full-stack web application for fair Gomoku matches in two modes: Human vs AI and AI vs AI. In Human vs AI mode, the human player uses Black and moves first while the AI uses White. In AI vs AI mode, separate Black and White model configurations play automatically. Every model move must pass through a backend referee that validates the board, checks wins and draws, filters model output, and falls back to deterministic legal moves when appropriate.
+Gomoku AI Arena is a full-stack web application for fair Gomoku matches in two modes: Human vs AI and AI vs AI. In Human vs AI mode, the human player uses Black and moves first while the AI uses White. In AI vs AI mode, separate Black and White model configurations play automatically. Every AI move is selected by the configured model service, then validated by the backend referee before it is applied.
 
 ## Features
 
-- Vue 3, Vite, and TypeScript frontend with a polished board-focused interface.
-- FastAPI backend with Pydantic models and deterministic Gomoku rules.
+- Vue 3, Vite, and TypeScript frontend with a board-focused interface.
+- FastAPI backend with Pydantic models and deterministic Gomoku rule validation.
 - OpenAI-compatible Chat Completions integration through `httpx`.
 - Configurable `base_url`, `api_key`, `model_name`, `temperature`, and `max_tokens`.
 - Human vs AI and AI vs AI match modes, with separate model configuration for each AI side in AI vs AI mode.
 - 15 x 15 board, zero-based row and column coordinates, last-move highlighting, star points, move history, and AI diagnostics.
 - Strict backend validation for every move. A model can suggest a move, but it cannot force an illegal move.
-- Threat-aware AI support with immediate win detection, forced blocking, candidate ranking, and fallback play.
+- No heuristic AI moves, automatic wins, forced blocks, ranked candidate selection, or fallback play.
+- Up to three retries for model move failures. If all attempts fail, the current game ends and the UI shows the error.
 
 ## Project Structure
 
@@ -24,7 +25,6 @@ backend/
     game_engine.py
     ai_client.py
     ai_prompt.py
-    ai_strategy.py
     config.py
     rule_checks.py
 frontend/
@@ -89,6 +89,7 @@ Fill in the setup panel before starting a match:
 - `model_name`: The model identifier used by the target service.
 - `temperature`: Lower values usually make play more consistent.
 - `max_tokens`: The maximum response length for the model move JSON. The default is 256 and the minimum is 128.
+- `retry_count`: The number of retries after an initial failed model call. The default is 3 and the maximum is 3.
 
 The backend resolves the Chat Completions URL as follows:
 
@@ -120,22 +121,21 @@ Use the model name exposed by the service. Some local services accept any non-em
 
 ## Fair Play Design
 
-The backend is the referee. It validates the board, rejects illegal moves, applies moves, checks wins and draws, and validates all AI output. Models only receive public board state, recent move history, rules, candidate moves, and threat analysis. They never receive hidden information, and a model move is accepted only if it is legal for the requested side.
+The backend is the referee. It validates the board, rejects illegal moves, applies moves, checks wins and draws, and validates all AI output. Models receive only public board state, recent move history, the rules, and the legal empty coordinates. They never receive hidden information or backend-ranked move suggestions.
 
-If the model returns malformed JSON, Markdown, an occupied coordinate, or an out-of-range coordinate, the backend retries with a clear correction message. If retries fail, the backend selects a legal fallback move from the ranked candidate set.
+If the model returns malformed JSON, Markdown, an occupied coordinate, or an out-of-range coordinate, the backend retries with a clear correction message. The backend does not choose a substitute move. If all retries fail, the backend returns an error and the frontend ends the current game in both Human vs AI and AI vs AI modes.
 
 If an OpenAI-compatible service reports that the response was cut off because `max_tokens` was too small, the frontend ends the current game and shows a non-modal status message asking the user to increase `max_tokens` for reasoning models.
 
-## AI Move Strategy
+## AI Move Policy
 
-Before calling the model, the backend analyzes the position:
+The application is model-only for AI decisions:
 
-- Immediate wins for the current AI side.
-- Immediate opponent wins that must be blocked.
-- Open fours, closed fours, open threes, line extensions, center control, and nearby stones.
-- A ranked candidate set near active stones, usually limited to a compact list for the prompt.
-
-The current AI side's immediate winning move is played directly without model latency. If the opponent has an immediate win and the current AI side does not, the model is constrained to blocking candidates; fallback also blocks from legal moves.
+- No deterministic immediate-win move is played before calling the model.
+- No deterministic forced block is played before calling the model.
+- No ranked candidate list is supplied to the model.
+- No fallback move is selected after model failure.
+- The backend only validates legality and game rules after the model returns a coordinate.
 
 ## Backend API
 
@@ -190,12 +190,14 @@ Request:
   "ai_settings": {
     "temperature": 0.25,
     "max_tokens": 256,
-    "retry_count": 2
+    "retry_count": 3
   }
 }
 ```
 
-`player` is `1` for Black AI and `2` for White AI. If omitted, it defaults to `2` for backwards compatibility. Response includes the selected move, updated board, game status, model or fallback source, reason, and diagnostics. Diagnostics never include the API key.
+`player` is `1` for Black AI and `2` for White AI. If omitted, it defaults to `2` for backwards compatibility. A successful response always contains a model-selected move, updated board, game status, reason, and diagnostics. Diagnostics never include the API key.
+
+If the model call fails after all attempts, the endpoint returns an error instead of a move. The frontend treats this as a terminal game failure and disables further play until the match is restarted.
 
 ## FAQ
 
@@ -205,7 +207,11 @@ Use the OpenAI-compatible endpoint from your provider. A `/v1` endpoint is recom
 
 ### Why did the model return an illegal coordinate?
 
-Language models can format or reason incorrectly. The backend treats model output as an untrusted suggestion and validates it before applying a move.
+Language models can format or reason incorrectly. The backend treats model output as an untrusted suggestion, validates it, and retries if the move is invalid.
+
+### Why does the game end after model errors?
+
+The application is intentionally model-only. It does not hide model failures behind deterministic fallback moves. After the retry budget is exhausted, the match ends and the UI shows the error.
 
 ### Why does the AI sometimes play poorly?
 
@@ -213,7 +219,7 @@ The model quality, prompt following, temperature, and local service capability a
 
 ### How can AI strength be improved?
 
-Use a stronger model, increase context quality, keep temperature low, and extend the deterministic strategy with deeper search or stronger pattern evaluation.
+Use a stronger model, keep temperature low, increase context quality in the prompt, or connect a model with better board-game reasoning.
 
 ### Is the API key saved?
 
