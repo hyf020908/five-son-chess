@@ -36,7 +36,7 @@ export interface AiMoveResponse {
   status: Exclude<GameStatus, 'waiting'>;
   winner: 1 | 2 | null;
   reason: string;
-  source: 'model' | 'heuristic_immediate_win' | 'heuristic_block' | 'fallback';
+  source: 'model';
   diagnostics: Diagnostics;
 }
 

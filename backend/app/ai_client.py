@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from .game_engine import validate_move
+from .game_engine import GameRuleError, validate_move
 from .models import AiSettings, ModelConfig
 
 
@@ -54,7 +54,10 @@ def parse_model_move(content: str, board: list[list[int]], player: int = 2) -> t
     reason = parsed.get("reason", "")
     if not isinstance(row, int) or not isinstance(col, int):
         raise AiClientError("Model JSON must include integer row and col.")
-    validate_move(board, row, col, player)
+    try:
+        validate_move(board, row, col, player)
+    except GameRuleError as exc:
+        raise AiClientError(f"Model returned an illegal move: {exc}") from exc
     return row, col, str(reason)[:500]
 
 
@@ -79,15 +82,23 @@ async def request_model_move(
     url = resolve_chat_completions_url(model_config.base_url)
 
     timeout = httpx.Timeout(35.0, connect=10.0)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        response = await client.post(url, headers=headers, json=payload)
     try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(url, headers=headers, json=payload)
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        detail = response.text[:300]
-        raise AiClientError(f"Model service returned HTTP {response.status_code}: {detail}") from exc
+        status_code = exc.response.status_code
+        if status_code in (401, 403):
+            raise AiClientError(f"Model service returned HTTP {status_code}. Check the API key, base URL, and model name.") from exc
+        detail = exc.response.text[:300]
+        raise AiClientError(f"Model service returned HTTP {status_code}: {detail}") from exc
+    except httpx.RequestError as exc:
+        raise AiClientError(f"Model service request failed: {exc}") from exc
 
-    data = response.json()
+    try:
+        data = response.json()
+    except json.JSONDecodeError as exc:
+        raise AiClientError("Model service response was not valid JSON.") from exc
     try:
         choice = data["choices"][0]
         finish_reason = choice.get("finish_reason")

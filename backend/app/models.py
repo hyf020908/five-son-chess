@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 from .config import BOARD_SIZE, DEFAULT_MAX_TOKENS, DEFAULT_RETRY_COUNT, DEFAULT_TEMPERATURE
 
 GameStatus = Literal["ongoing", "black_win", "white_win", "draw"]
-MoveSource = Literal["model", "heuristic_immediate_win", "heuristic_block", "fallback"]
+MoveSource = Literal["model"]
 
 
 class Move(BaseModel):
@@ -34,7 +34,7 @@ class ModelConfig(BaseModel):
 class AiSettings(BaseModel):
     temperature: float = Field(default=DEFAULT_TEMPERATURE, ge=0.0, le=2.0)
     max_tokens: int = Field(default=DEFAULT_MAX_TOKENS, ge=128, le=4096)
-    retry_count: int = Field(default=DEFAULT_RETRY_COUNT, ge=0, le=4)
+    retry_count: int = Field(default=DEFAULT_RETRY_COUNT, ge=0, le=3)
     reasoning_effort: Optional[str] = None
 
 

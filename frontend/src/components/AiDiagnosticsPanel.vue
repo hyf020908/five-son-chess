@@ -21,19 +21,15 @@ defineProps<{
         <dd>{{ source || 'none' }}</dd>
       </div>
       <div>
-        <dt>Retries</dt>
+        <dt>Retries used</dt>
         <dd>{{ diagnostics?.retry_count ?? 0 }}</dd>
       </div>
       <div>
-        <dt>Candidates</dt>
+        <dt>Legal moves</dt>
         <dd>{{ diagnostics?.candidate_count ?? 0 }}</dd>
       </div>
-      <div>
-        <dt>Score</dt>
-        <dd>{{ diagnostics?.selected_score ?? 'n/a' }}</dd>
-      </div>
     </dl>
-    <p class="muted">{{ diagnostics?.brief_analysis || 'The backend will summarize threats and candidates after White moves.' }}</p>
+    <p class="muted">{{ diagnostics?.brief_analysis || 'The backend will report model-move validation details after an AI move.' }}</p>
     <div v-if="diagnostics?.selected_tags.length" class="tag-row">
       <span v-for="tag in diagnostics.selected_tags" :key="tag">{{ tag }}</span>
     </div>

@@ -25,7 +25,6 @@ const diagnostics = ref<Diagnostics | null>(null);
 const errorMessage = ref('');
 const gameStarted = ref(false);
 const gameResultDialogVisible = ref(false);
-const tokenLimitGameOverMessage = 'For reasoning models, increase max_tokens to prevent move failures. This game is over!';
 const gameMode = ref<GameMode>('human_ai');
 let aiVsAiRunId = 0;
 
@@ -44,7 +43,7 @@ const blackModelConfig = reactive<ModelConfig>({
 const aiSettings = reactive<AiSettings>({
   temperature: 0.25,
   max_tokens: 256,
-  retry_count: 2,
+  retry_count: 3,
 });
 
 const gameResultMessage = computed(() => {
@@ -134,11 +133,12 @@ async function applyAiMove(player: 1 | 2, config: ModelConfig) {
   diagnostics.value = aiResponse.diagnostics;
 }
 
-function endGameForTokenLimit(message: string) {
+function endGameForAiFailure(message: string) {
   errorMessage.value = message;
   gameStarted.value = false;
   gameStatus.value = 'waiting';
   gameResultDialogVisible.value = false;
+  aiThinking.value = false;
   aiVsAiRunId += 1;
 }
 
@@ -151,14 +151,7 @@ async function runAiVsAiGame(runId: number) {
       await applyAiMove(player, config);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unexpected request failure.';
-      if (message === tokenLimitGameOverMessage) {
-        endGameForTokenLimit(message);
-      } else {
-        errorMessage.value = message;
-        gameStarted.value = false;
-        gameStatus.value = 'waiting';
-        aiVsAiRunId += 1;
-      }
+      endGameForAiFailure(message);
       return;
     } finally {
       aiThinking.value = false;
@@ -195,10 +188,7 @@ async function onPlace(row: number, col: number) {
     await applyAiMove(2, modelConfig);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected request failure.';
-    errorMessage.value = message;
-    if (message === tokenLimitGameOverMessage) {
-      endGameForTokenLimit(message);
-    }
+    endGameForAiFailure(message);
   } finally {
     aiThinking.value = false;
   }
