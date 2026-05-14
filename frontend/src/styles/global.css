@@ -456,8 +456,7 @@ input:focus {
   font-weight: 800;
 }
 
-.player-pill,
-.tag-row span {
+.player-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -478,12 +477,6 @@ input:focus {
   background: #f6ecff;
   color: #27103d;
   border: 1px solid rgba(255, 255, 255, 0.62);
-}
-
-.reason {
-  margin-top: 0;
-  color: rgba(249, 242, 255, 0.92);
-  line-height: 1.5;
 }
 
 .metrics {
@@ -508,19 +501,6 @@ dd {
   margin: 4px 0 0;
   font-weight: 800;
   word-break: break-word;
-}
-
-.tag-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 14px;
-}
-
-.tag-row span {
-  background: rgba(224, 126, 255, 0.18);
-  border: 1px solid rgba(238, 207, 255, 0.22);
-  color: #f2d8ff;
 }
 
 .result-dialog-backdrop {

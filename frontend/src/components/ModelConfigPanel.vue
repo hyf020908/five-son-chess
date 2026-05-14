@@ -86,10 +86,6 @@ const emit = defineEmits<{
         <span>Temperature</span>
         <input v-model.number="aiSettings.temperature" type="number" min="0" max="2" step="0.05" />
       </label>
-      <label>
-        <span>Max tokens</span>
-        <input v-model.number="aiSettings.max_tokens" type="number" min="128" max="4096" step="16" />
-      </label>
     </div>
 
     <div class="button-row">

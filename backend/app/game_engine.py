@@ -98,7 +98,7 @@ def get_legal_moves(board: list[list[int]]) -> list[tuple[int, int]]:
 
 def serialize_board_for_prompt(board: list[list[int]]) -> str:
     validate_board(board)
-    symbols = {EMPTY: ".", BLACK: "B", WHITE: "W"}
+    symbols = {EMPTY: "0", BLACK: "B", WHITE: "W"}
     header = "    " + " ".join(f"{col:02d}" for col in range(BOARD_SIZE))
     lines = [header]
     for row_index, row in enumerate(board):

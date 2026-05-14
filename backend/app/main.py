@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from .ai_client import AiClientError, AiTokenLimitError, parse_model_move, request_model_move
+from .ai_client import AiClientError, parse_model_move, request_model_move
 from .ai_prompt import build_ai_messages
 from .config import ALLOWED_ORIGINS
 from .game_engine import GameRuleError, apply_move, get_legal_moves, get_status, validate_board
@@ -44,7 +44,6 @@ def _response_from_model_move(
     player: int,
     retry_count: int,
     legal_move_count: int,
-    reason: str,
 ) -> AiMoveResponse:
     next_board = apply_move(board, row, col, player)
     status, winner = get_status(next_board)
@@ -54,15 +53,12 @@ def _response_from_model_move(
         board=next_board,
         status=status,
         winner=winner,
-        reason=reason or "Selected by the model.",
         source="model",
         diagnostics=Diagnostics(
             model_called=True,
             retry_count=retry_count,
             candidate_count=legal_move_count,
             brief_analysis="The move was selected by the model from the current board state and validated by the backend referee.",
-            selected_score=None,
-            selected_tags=[],
         ),
     )
 
@@ -86,7 +82,7 @@ async def ai_move(request: AiMoveRequest) -> AiMoveResponse:
             try:
                 messages = build_ai_messages(request.board, request.move_history, request.player, last_error)
                 content = await request_model_move(request.config, request.ai_settings, messages)
-                row, col, reason = parse_model_move(content, request.board, request.player)
+                row, col = parse_model_move(content, request.board, request.player)
                 return _response_from_model_move(
                     request.board,
                     row,
@@ -94,13 +90,7 @@ async def ai_move(request: AiMoveRequest) -> AiMoveResponse:
                     request.player,
                     retry_count,
                     len(legal_moves),
-                    reason,
                 )
-            except AiTokenLimitError as exc:
-                raise HTTPException(
-                    status_code=400,
-                    detail="For reasoning models, increase max_tokens to prevent move failures. The game has ended.",
-                ) from exc
             except AiClientError as exc:
                 last_error = str(exc)
 

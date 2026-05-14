@@ -16,7 +16,6 @@ export interface ModelConfig {
 
 export interface AiSettings {
   temperature: number;
-  max_tokens: number;
   retry_count: number;
 }
 
@@ -25,8 +24,6 @@ export interface Diagnostics {
   retry_count: number;
   candidate_count: number;
   brief_analysis: string;
-  selected_score: number | null;
-  selected_tags: string[];
 }
 
 export interface AiMoveResponse {
@@ -35,7 +32,6 @@ export interface AiMoveResponse {
   board: Cell[][];
   status: Exclude<GameStatus, 'waiting'>;
   winner: 1 | 2 | null;
-  reason: string;
   source: 'model';
   diagnostics: Diagnostics;
 }

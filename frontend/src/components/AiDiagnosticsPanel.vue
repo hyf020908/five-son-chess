@@ -2,7 +2,6 @@
 import type { Diagnostics } from '../types/game';
 
 defineProps<{
-  reason: string;
   source: string;
   diagnostics: Diagnostics | null;
 }>();
@@ -14,7 +13,6 @@ defineProps<{
       <p class="eyebrow">AI analysis</p>
       <h2>Decision details</h2>
     </div>
-    <p class="reason">{{ reason || 'No AI move has been requested yet.' }}</p>
     <dl class="metrics">
       <div>
         <dt>Source</dt>
@@ -30,8 +28,5 @@ defineProps<{
       </div>
     </dl>
     <p class="muted">{{ diagnostics?.brief_analysis || 'The backend will report model-move validation details after an AI move.' }}</p>
-    <div v-if="diagnostics?.selected_tags.length" class="tag-row">
-      <span v-for="tag in diagnostics.selected_tags" :key="tag">{{ tag }}</span>
-    </div>
   </section>
 </template>

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from .config import BLACK, WHITE
-from .game_engine import get_legal_moves, get_move_history_text, serialize_board_for_prompt
+from .game_engine import get_move_history_text, serialize_board_for_prompt
 from .models import Move
 
 
@@ -15,11 +15,9 @@ def build_ai_messages(
 ) -> list[dict[str, str]]:
     ai_color = "Black" if ai_player == BLACK else "White"
     opponent_color = "White" if ai_player == BLACK else "Black"
-    legal_moves = get_legal_moves(board)
-    legal_move_text = ", ".join(f"({row}, {col})" for row, col in legal_moves)
 
     error_section = (
-        f"\nPrevious response error: {last_error}\nReturn a corrected legal JSON move."
+        f"\nPrevious response error: {last_error}\nReturn a corrected legal JSON move with row and col only. The coordinate must point to a 0 cell."
         if last_error
         else ""
     )
@@ -27,29 +25,29 @@ def build_ai_messages(
 Board size: 15 x 15.
 Coordinates are zero-based integers. Use row 0..14 and col 0..14.
 {ai_color} is the AI player. {opponent_color} is the opponent. It is {ai_color}'s turn.
+Cell legend: 0 = empty legal cell, B = Black stone, W = White stone.
+You may place a stone only on a 0 cell. You must not choose a B or W cell.
 
 Board:
 {serialize_board_for_prompt(board)}
 
 Recent move history:
 {get_move_history_text(move_history)}
-
-Legal empty coordinates:
-{legal_move_text}
 {error_section}
 
-Choose exactly one legal empty coordinate. Use only your own Gomoku analysis. No pre-ranked candidate list or deterministic strategy suggestion is provided.
+Choose exactly one empty coordinate from the matrix. Use only your own Gomoku analysis. No pre-ranked candidate list or deterministic strategy suggestion is provided.
 """.strip()
 
     system_content = """
 You are playing fair Gomoku as the AI player.
 Rules: five or more consecutive stones horizontally, vertically, or diagonally wins. Occupied cells are illegal. The game state has no hidden information.
-You must choose the move only from the visible board state and the legal coordinate list. The application will not provide heuristic move choices, automatic wins, forced blocks, ranked candidates, or fallback moves.
+The board is provided as a fixed matrix. In the matrix, 0 means an empty legal cell, B means a Black stone, and W means a White stone. You must choose a coordinate whose matrix value is 0.
+The application will not provide heuristic move choices, automatic wins, forced blocks, ranked candidates, legal-coordinate lists, or fallback moves.
 
-Return strict JSON only, with this shape:
-{"row": 7, "col": 8, "reason": "This move creates the strongest threat while reducing the opponent's options."}
+Return strict JSON only, with this exact shape:
+{"row": 7, "col": 8}
 
-Do not return Markdown. Do not use a code block. Do not include extra text.
+Do not include any other keys. Do not return Markdown. Do not use a code block. Do not include extra text.
 """.strip()
 
     return [

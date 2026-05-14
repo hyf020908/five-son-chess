@@ -19,7 +19,6 @@ const moveHistory = ref<Move[]>([]);
 const gameStatus = ref<GameStatus>('waiting');
 const aiThinking = ref(false);
 const lastMove = ref<Move | null>(null);
-const aiReason = ref('');
 const aiSource = ref('');
 const diagnostics = ref<Diagnostics | null>(null);
 const errorMessage = ref('');
@@ -42,7 +41,6 @@ const blackModelConfig = reactive<ModelConfig>({
 
 const aiSettings = reactive<AiSettings>({
   temperature: 0.25,
-  max_tokens: 256,
   retry_count: 3,
 });
 
@@ -70,7 +68,6 @@ function resetGame() {
   gameStatus.value = gameStarted.value ? 'ongoing' : 'waiting';
   aiThinking.value = false;
   lastMove.value = null;
-  aiReason.value = '';
   aiSource.value = '';
   diagnostics.value = null;
   errorMessage.value = '';
@@ -96,10 +93,6 @@ function validateModelConfig(config: ModelConfig, label: string): boolean {
 function validateConfig(): boolean {
   if (gameMode.value === 'ai_ai' && !validateModelConfig(blackModelConfig, 'Black model')) return false;
   if (!validateModelConfig(modelConfig, gameMode.value === 'ai_ai' ? 'White model' : 'AI model')) return false;
-  if (!Number.isFinite(aiSettings.max_tokens) || aiSettings.max_tokens < 128) {
-    errorMessage.value = 'Max tokens must be at least 128.';
-    return false;
-  }
   return true;
 }
 
@@ -128,7 +121,6 @@ async function applyAiMove(player: 1 | 2, config: ModelConfig) {
   moveHistory.value = [...moveHistory.value, aiMove];
   lastMove.value = aiMove;
   gameStatus.value = aiResponse.status;
-  aiReason.value = aiResponse.reason;
   aiSource.value = aiResponse.source;
   diagnostics.value = aiResponse.diagnostics;
 }
@@ -238,7 +230,7 @@ async function onPlace(row: number, col: number) {
       />
 
       <aside class="right-column">
-        <AiDiagnosticsPanel :reason="aiReason" :source="aiSource" :diagnostics="diagnostics" />
+        <AiDiagnosticsPanel :source="aiSource" :diagnostics="diagnostics" />
         <MoveHistory :moves="moveHistory" />
       </aside>
     </div>

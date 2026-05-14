@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from .config import BOARD_SIZE, DEFAULT_MAX_TOKENS, DEFAULT_RETRY_COUNT, DEFAULT_TEMPERATURE
+from .config import BOARD_SIZE, DEFAULT_RETRY_COUNT, DEFAULT_TEMPERATURE
 
 GameStatus = Literal["ongoing", "black_win", "white_win", "draw"]
 MoveSource = Literal["model"]
@@ -33,9 +33,7 @@ class ModelConfig(BaseModel):
 
 class AiSettings(BaseModel):
     temperature: float = Field(default=DEFAULT_TEMPERATURE, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=DEFAULT_MAX_TOKENS, ge=128, le=4096)
     retry_count: int = Field(default=DEFAULT_RETRY_COUNT, ge=0, le=3)
-    reasoning_effort: Optional[str] = None
 
 
 class ValidateMoveRequest(BaseModel):
@@ -67,8 +65,6 @@ class Diagnostics(BaseModel):
     retry_count: int
     candidate_count: int
     brief_analysis: str
-    selected_score: Optional[int] = None
-    selected_tags: list[str] = Field(default_factory=list)
 
 
 class AiMoveResponse(BaseModel):
@@ -77,6 +73,5 @@ class AiMoveResponse(BaseModel):
     board: list[list[int]]
     status: GameStatus
     winner: Optional[int]
-    reason: str
     source: MoveSource
     diagnostics: Diagnostics
