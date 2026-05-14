@@ -130,18 +130,19 @@ def _find_immediate_wins(board: list[list[int]], player: int) -> list[CandidateM
     return sorted(moves, key=lambda move: (_distance_to_center(move.row, move.col), move.row, move.col))
 
 
-def analyze_position(board: list[list[int]], limit: int = 32) -> StrategyReport:
+def analyze_position(board: list[list[int]], ai_player: int = WHITE, limit: int = 32) -> StrategyReport:
     legal_moves = get_legal_moves(board)
     if not legal_moves:
         return StrategyReport([], [], [], "The board has no legal moves.")
 
-    immediate_wins = _find_immediate_wins(board, WHITE)
-    opponent_wins = _find_immediate_wins(board, BLACK)
+    opponent = BLACK if ai_player == WHITE else WHITE
+    immediate_wins = _find_immediate_wins(board, ai_player)
+    opponent_wins = _find_immediate_wins(board, opponent)
 
     candidates_by_coord: dict[tuple[int, int], CandidateMove] = {}
     for row, col in _candidate_pool(board):
-        attack_score, attack_tags = _score_for_player(board, row, col, WHITE, "create")
-        defense_score, defense_tags = _score_for_player(board, row, col, BLACK, "block")
+        attack_score, attack_tags = _score_for_player(board, row, col, ai_player, "create")
+        defense_score, defense_tags = _score_for_player(board, row, col, opponent, "block")
         neighbor_score = _neighbor_count(board, row, col) * 85
         center_score = max(0, 14 - _distance_to_center(row, col)) * 22
 
@@ -165,14 +166,14 @@ def analyze_position(board: list[list[int]], limit: int = 32) -> StrategyReport:
         if existing:
             existing.score = max(existing.score, 920_000)
             existing.tags = list(dict.fromkeys(["block_opponent_win"] + existing.tags))
-            existing.reason = "Blocks an immediate black win."
+            existing.reason = "Blocks an immediate opponent win."
         else:
             candidates_by_coord[(move.row, move.col)] = CandidateMove(
                 row=move.row,
                 col=move.col,
                 score=920_000,
                 tags=["block_opponent_win"],
-                reason="Blocks an immediate black win.",
+                reason="Blocks an immediate opponent win.",
             )
 
     candidates = sorted(
@@ -182,8 +183,8 @@ def analyze_position(board: list[list[int]], limit: int = 32) -> StrategyReport:
 
     brief_parts = [
         f"{len(legal_moves)} legal moves",
-        f"{len(immediate_wins)} white immediate wins",
-        f"{len(opponent_wins)} black immediate threats",
+        f"{len(immediate_wins)} AI immediate wins",
+        f"{len(opponent_wins)} opponent immediate threats",
         f"{len(candidates)} prioritized candidates",
     ]
     if candidates:

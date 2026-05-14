@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .ai_client import AiClientError, AiTokenLimitError, parse_model_move, request_model_move
 from .ai_prompt import build_ai_messages
 from .ai_strategy import CandidateMove, analyze_position, choose_fallback_candidate
-from .config import ALLOWED_ORIGINS, BLACK, WHITE
+from .config import ALLOWED_ORIGINS
 from .game_engine import GameRuleError, apply_move, get_status, validate_board
 from .models import AiMoveRequest, AiMoveResponse, Diagnostics, ValidateMoveRequest, ValidateMoveResponse
 
@@ -41,6 +41,7 @@ async def validate_player_move(request: ValidateMoveRequest) -> ValidateMoveResp
 def _response_from_candidate(
     board: list[list[int]],
     candidate: CandidateMove,
+    player: int,
     source: str,
     model_called: bool,
     retry_count: int,
@@ -48,7 +49,7 @@ def _response_from_candidate(
     brief_analysis: str,
     reason: Optional[str] = None,
 ) -> AiMoveResponse:
-    next_board = apply_move(board, candidate.row, candidate.col, WHITE)
+    next_board = apply_move(board, candidate.row, candidate.col, player)
     status, winner = get_status(next_board)
     return AiMoveResponse(
         row=candidate.row,
@@ -77,7 +78,7 @@ async def ai_move(request: AiMoveRequest) -> AiMoveResponse:
         if status != "ongoing":
             raise HTTPException(status_code=400, detail="The game is already finished.")
 
-        report = analyze_position(request.board)
+        report = analyze_position(request.board, request.player)
         if not report.candidates and not report.immediate_wins and not report.opponent_immediate_wins:
             raise HTTPException(status_code=400, detail="No legal moves are available.")
 
@@ -86,12 +87,13 @@ async def ai_move(request: AiMoveRequest) -> AiMoveResponse:
             return _response_from_candidate(
                 request.board,
                 candidate,
+                request.player,
                 "heuristic_immediate_win",
                 False,
                 0,
                 len(report.candidates),
                 report.brief_analysis,
-                "White has an immediate winning move.",
+                "AI has an immediate winning move.",
             )
 
         forced_block_only = bool(report.opponent_immediate_wins)
@@ -105,12 +107,12 @@ async def ai_move(request: AiMoveRequest) -> AiMoveResponse:
                 if forced_block_only:
                     block_coords = {(move.row, move.col) for move in report.opponent_immediate_wins}
                     constrained_report.candidates = [candidate for candidate in report.candidates if (candidate.row, candidate.col) in block_coords]
-                messages = build_ai_messages(request.board, request.move_history, constrained_report, last_error)
+                messages = build_ai_messages(request.board, request.move_history, constrained_report, request.player, last_error)
                 content = await request_model_move(request.config, request.ai_settings, messages)
-                row, col, reason = parse_model_move(content, request.board)
+                row, col, reason = parse_model_move(content, request.board, request.player)
 
                 if forced_block_only and (row, col) not in {(move.row, move.col) for move in report.opponent_immediate_wins}:
-                    raise AiClientError("Returned coordinate does not block Black's immediate win.")
+                    raise AiClientError("Returned coordinate does not block the opponent's immediate win.")
 
                 selected = next((candidate for candidate in report.candidates if candidate.row == row and candidate.col == col), None)
                 if selected is None:
@@ -118,6 +120,7 @@ async def ai_move(request: AiMoveRequest) -> AiMoveResponse:
                 return _response_from_candidate(
                     request.board,
                     selected,
+                    request.player,
                     "model",
                     True,
                     attempt,
@@ -129,7 +132,7 @@ async def ai_move(request: AiMoveRequest) -> AiMoveResponse:
                 if isinstance(exc, AiTokenLimitError):
                     raise HTTPException(
                         status_code=400,
-                        detail="对于思考模型，请适当增大max_tokens，防止下棋失败，本局游戏结束！",
+                        detail="For reasoning models, increase max_tokens to prevent move failures. This game is over!",
                     ) from exc
                 last_error = str(exc)
 
@@ -141,6 +144,7 @@ async def ai_move(request: AiMoveRequest) -> AiMoveResponse:
         return _response_from_candidate(
             request.board,
             fallback,
+            request.player,
             source,
             True,
             attempts,

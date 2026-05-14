@@ -57,6 +57,7 @@ class ValidateMoveResponse(BaseModel):
 class AiMoveRequest(BaseModel):
     board: list[list[int]]
     move_history: list[Move] = Field(default_factory=list)
+    player: int = Field(default=2, ge=1, le=2)
     config: ModelConfig = Field(alias="model_config")
     ai_settings: AiSettings = Field(default_factory=AiSettings)
 

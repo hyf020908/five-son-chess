@@ -47,14 +47,14 @@ def extract_json_object(content: str) -> dict[str, Any]:
     return parsed
 
 
-def parse_model_move(content: str, board: list[list[int]]) -> tuple[int, int, str]:
+def parse_model_move(content: str, board: list[list[int]], player: int = 2) -> tuple[int, int, str]:
     parsed = extract_json_object(content)
     row = parsed.get("row")
     col = parsed.get("col")
     reason = parsed.get("reason", "")
     if not isinstance(row, int) or not isinstance(col, int):
         raise AiClientError("Model JSON must include integer row and col.")
-    validate_move(board, row, col, 2)
+    validate_move(board, row, col, player)
     return row, col, str(reason)[:500]
 
 

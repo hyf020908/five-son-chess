@@ -1,5 +1,6 @@
 export type Cell = 0 | 1 | 2;
 export type GameStatus = 'waiting' | 'ongoing' | 'black_win' | 'white_win' | 'draw';
+export type GameMode = 'human_ai' | 'ai_ai';
 
 export interface Move {
   row: number;

@@ -1,6 +1,6 @@
 # Gomoku AI Arena
 
-Gomoku AI Arena is a full-stack web application for fair human vs AI Gomoku matches. The human player uses Black and moves first. The AI uses White and must play through a backend referee that validates the board, checks wins and draws, filters model output, and falls back to deterministic legal moves when needed.
+Gomoku AI Arena is a full-stack web application for fair Gomoku matches in two modes: Human vs AI and AI vs AI. In Human vs AI mode, the human player uses Black and moves first while the AI uses White. In AI vs AI mode, separate Black and White model configurations play automatically. Every model move must pass through a backend referee that validates the board, checks wins and draws, filters model output, and falls back to deterministic legal moves when appropriate.
 
 ## Features
 
@@ -8,6 +8,7 @@ Gomoku AI Arena is a full-stack web application for fair human vs AI Gomoku matc
 - FastAPI backend with Pydantic models and deterministic Gomoku rules.
 - OpenAI-compatible Chat Completions integration through `httpx`.
 - Configurable `base_url`, `api_key`, `model_name`, `temperature`, and `max_tokens`.
+- Human vs AI and AI vs AI match modes, with separate model configuration for each AI side in AI vs AI mode.
 - 15 x 15 board, zero-based row and column coordinates, last-move highlighting, star points, move history, and AI diagnostics.
 - Strict backend validation for every move. A model can suggest a move, but it cannot force an illegal move.
 - Threat-aware AI support with immediate win detection, forced blocking, candidate ranking, and fallback play.
@@ -80,11 +81,14 @@ The frontend uses `http://127.0.0.1:8000` as the default backend URL.
 
 Fill in the setup panel before starting a match:
 
+- Mode:
+  - Human vs AI uses one AI model. The human plays Black and the AI plays White.
+  - AI vs AI uses two AI model configurations, one for Black and one for White. The match runs automatically after start.
 - `base_url`: The model service base URL. It may be a root URL, a `/v1` URL, or a full `/chat/completions` URL.
 - `api_key`: Sent only with the AI move request. It is kept in page memory and is not stored in local storage.
 - `model_name`: The model identifier used by the target service.
 - `temperature`: Lower values usually make play more consistent.
-- `max_tokens`: The maximum response length for the model move JSON.
+- `max_tokens`: The maximum response length for the model move JSON. The default is 256 and the minimum is 128.
 
 The backend resolves the Chat Completions URL as follows:
 
@@ -106,8 +110,9 @@ Use the model name exposed by the service. Some local services accept any non-em
 
 - The board is 15 x 15.
 - Rows and columns are zero-based.
-- Black is the human player and moves first.
-- White is the AI player.
+- Black always moves first.
+- In Human vs AI mode, Black is the human player and White is the AI player.
+- In AI vs AI mode, Black AI and White AI play automatically.
 - Five or more consecutive stones horizontally, vertically, or diagonally wins.
 - Occupied cells cannot be played.
 - No moves are accepted after a win or draw.
@@ -115,20 +120,22 @@ Use the model name exposed by the service. Some local services accept any non-em
 
 ## Fair Play Design
 
-The backend is the referee. It validates the board, rejects illegal moves, applies moves, checks wins and draws, and validates all AI output. The model only receives public board state, recent move history, rules, candidate moves, and threat analysis. It never receives hidden information, and its move is accepted only if it is legal.
+The backend is the referee. It validates the board, rejects illegal moves, applies moves, checks wins and draws, and validates all AI output. Models only receive public board state, recent move history, rules, candidate moves, and threat analysis. They never receive hidden information, and a model move is accepted only if it is legal for the requested side.
 
 If the model returns malformed JSON, Markdown, an occupied coordinate, or an out-of-range coordinate, the backend retries with a clear correction message. If retries fail, the backend selects a legal fallback move from the ranked candidate set.
+
+If an OpenAI-compatible service reports that the response was cut off because `max_tokens` was too small, the frontend ends the current game and shows a non-modal status message asking the user to increase `max_tokens` for reasoning models.
 
 ## AI Move Strategy
 
 Before calling the model, the backend analyzes the position:
 
-- Immediate White wins.
-- Immediate Black wins that must be blocked.
+- Immediate wins for the current AI side.
+- Immediate opponent wins that must be blocked.
 - Open fours, closed fours, open threes, line extensions, center control, and nearby stones.
 - A ranked candidate set near active stones, usually limited to a compact list for the prompt.
 
-White's immediate winning move is played directly without model latency. If Black has an immediate win and White does not, the model is constrained to blocking candidates; fallback also blocks from legal moves.
+The current AI side's immediate winning move is played directly without model latency. If the opponent has an immediate win and the current AI side does not, the model is constrained to blocking candidates; fallback also blocks from legal moves.
 
 ## Backend API
 
@@ -174,6 +181,7 @@ Request:
 {
   "board": [],
   "move_history": [],
+  "player": 2,
   "model_config": {
     "base_url": "http://127.0.0.1:11434/v1",
     "api_key": "not-stored",
@@ -181,13 +189,13 @@ Request:
   },
   "ai_settings": {
     "temperature": 0.25,
-    "max_tokens": 220,
+    "max_tokens": 256,
     "retry_count": 2
   }
 }
 ```
 
-Response includes the selected move, updated board, game status, model or fallback source, reason, and diagnostics. Diagnostics never include the API key.
+`player` is `1` for Black AI and `2` for White AI. If omitted, it defaults to `2` for backwards compatibility. Response includes the selected move, updated board, game status, model or fallback source, reason, and diagnostics. Diagnostics never include the API key.
 
 ## FAQ
 

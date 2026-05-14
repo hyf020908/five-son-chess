@@ -25,11 +25,12 @@ export async function requestAiMove(
   moveHistory: Move[],
   modelConfig: ModelConfig,
   aiSettings: AiSettings,
+  player: 1 | 2 = 2,
 ) {
   const response = await fetch(`${API_BASE_URL}/api/ai-move`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ board, move_history: moveHistory, model_config: modelConfig, ai_settings: aiSettings }),
+    body: JSON.stringify({ board, move_history: moveHistory, player, model_config: modelConfig, ai_settings: aiSettings }),
   });
   return readJson<AiMoveResponse>(response);
 }

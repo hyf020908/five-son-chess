@@ -6,7 +6,7 @@ import GameStatusPanel from './components/GameStatusPanel.vue';
 import GomokuBoard from './components/GomokuBoard.vue';
 import ModelConfigPanel from './components/ModelConfigPanel.vue';
 import MoveHistory from './components/MoveHistory.vue';
-import type { AiSettings, Cell, Diagnostics, GameStatus, ModelConfig, Move } from './types/game';
+import type { AiSettings, Cell, Diagnostics, GameMode, GameStatus, ModelConfig, Move } from './types/game';
 
 const BOARD_SIZE = 15;
 
@@ -25,9 +25,17 @@ const diagnostics = ref<Diagnostics | null>(null);
 const errorMessage = ref('');
 const gameStarted = ref(false);
 const gameResultDialogVisible = ref(false);
-const tokenLimitGameOverMessage = '对于思考模型，请适当增大max_tokens，防止下棋失败，本局游戏结束！';
+const tokenLimitGameOverMessage = 'For reasoning models, increase max_tokens to prevent move failures. This game is over!';
+const gameMode = ref<GameMode>('human_ai');
+let aiVsAiRunId = 0;
 
 const modelConfig = reactive<ModelConfig>({
+  base_url: 'http://127.0.0.1:11434/v1',
+  api_key: '',
+  model_name: '',
+});
+
+const blackModelConfig = reactive<ModelConfig>({
   base_url: 'http://127.0.0.1:11434/v1',
   api_key: '',
   model_name: '',
@@ -40,9 +48,15 @@ const aiSettings = reactive<AiSettings>({
 });
 
 const gameResultMessage = computed(() => {
-  if (gameStatus.value === 'black_win') return '✅恭喜你，赢得比赛！';
-  if (gameStatus.value === 'white_win') return '😧再接再厉！下次加油！';
-  if (gameStatus.value === 'draw') return '♟️平局';
+  if (gameMode.value === 'ai_ai') {
+    if (gameStatus.value === 'black_win') return `${blackModelConfig.model_name.trim() || 'Black'} model wins`;
+    if (gameStatus.value === 'white_win') return `${modelConfig.model_name.trim() || 'White'} model wins`;
+    if (gameStatus.value === 'draw') return 'Draw';
+    return '';
+  }
+  if (gameStatus.value === 'black_win') return '✅ Congratulations, you won the match!';
+  if (gameStatus.value === 'white_win') return '😧 Keep trying! Better luck next time!';
+  if (gameStatus.value === 'draw') return '♟️ Draw';
   return '';
 });
 
@@ -51,6 +65,7 @@ watch(gameStatus, (status) => {
 });
 
 function resetGame() {
+  aiVsAiRunId += 1;
   board.value = createBoard();
   moveHistory.value = [];
   gameStatus.value = gameStarted.value ? 'ongoing' : 'waiting';
@@ -63,19 +78,25 @@ function resetGame() {
   gameResultDialogVisible.value = false;
 }
 
+function validateModelConfig(config: ModelConfig, label: string): boolean {
+  if (!config.base_url.trim()) {
+    errorMessage.value = `${label} Base URL is required.`;
+    return false;
+  }
+  if (!config.api_key.trim()) {
+    errorMessage.value = `${label} API key is required.`;
+    return false;
+  }
+  if (!config.model_name.trim()) {
+    errorMessage.value = `${label} Model name is required.`;
+    return false;
+  }
+  return true;
+}
+
 function validateConfig(): boolean {
-  if (!modelConfig.base_url.trim()) {
-    errorMessage.value = 'Base URL is required.';
-    return false;
-  }
-  if (!modelConfig.api_key.trim()) {
-    errorMessage.value = 'API key is required for the model service.';
-    return false;
-  }
-  if (!modelConfig.model_name.trim()) {
-    errorMessage.value = 'Model name is required.';
-    return false;
-  }
+  if (gameMode.value === 'ai_ai' && !validateModelConfig(blackModelConfig, 'Black model')) return false;
+  if (!validateModelConfig(modelConfig, gameMode.value === 'ai_ai' ? 'White model' : 'AI model')) return false;
   if (!Number.isFinite(aiSettings.max_tokens) || aiSettings.max_tokens < 128) {
     errorMessage.value = 'Max tokens must be at least 128.';
     return false;
@@ -89,10 +110,67 @@ function startGame() {
   gameStarted.value = true;
   resetGame();
   gameStatus.value = 'ongoing';
+  if (gameMode.value === 'ai_ai') {
+    void runAiVsAiGame(aiVsAiRunId);
+  }
+}
+
+function onModeChange(mode: GameMode) {
+  if (aiThinking.value) return;
+  gameMode.value = mode;
+  gameStarted.value = false;
+  resetGame();
+}
+
+async function applyAiMove(player: 1 | 2, config: ModelConfig) {
+  const aiResponse = await requestAiMove(board.value, moveHistory.value, config, aiSettings, player);
+  const aiMove: Move = { row: aiResponse.row, col: aiResponse.col, player };
+  board.value = aiResponse.board;
+  moveHistory.value = [...moveHistory.value, aiMove];
+  lastMove.value = aiMove;
+  gameStatus.value = aiResponse.status;
+  aiReason.value = aiResponse.reason;
+  aiSource.value = aiResponse.source;
+  diagnostics.value = aiResponse.diagnostics;
+}
+
+function endGameForTokenLimit(message: string) {
+  errorMessage.value = message;
+  gameStarted.value = false;
+  gameStatus.value = 'waiting';
+  gameResultDialogVisible.value = false;
+  aiVsAiRunId += 1;
+}
+
+async function runAiVsAiGame(runId: number) {
+  while (runId === aiVsAiRunId && gameStarted.value && gameStatus.value === 'ongoing') {
+    const player = (moveHistory.value.length % 2 === 0 ? 1 : 2) as 1 | 2;
+    const config = player === 1 ? blackModelConfig : modelConfig;
+    aiThinking.value = true;
+    try {
+      await applyAiMove(player, config);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unexpected request failure.';
+      if (message === tokenLimitGameOverMessage) {
+        endGameForTokenLimit(message);
+      } else {
+        errorMessage.value = message;
+        gameStarted.value = false;
+        gameStatus.value = 'waiting';
+        aiVsAiRunId += 1;
+      }
+      return;
+    } finally {
+      aiThinking.value = false;
+    }
+
+    if (gameStatus.value !== 'ongoing') return;
+    await new Promise((resolve) => window.setTimeout(resolve, 300));
+  }
 }
 
 async function onPlace(row: number, col: number) {
-  if (!gameStarted.value || aiThinking.value || gameStatus.value !== 'ongoing') return;
+  if (gameMode.value !== 'human_ai' || !gameStarted.value || aiThinking.value || gameStatus.value !== 'ongoing') return;
   if (board.value[row][col] !== 0) return;
 
   errorMessage.value = '';
@@ -114,22 +192,12 @@ async function onPlace(row: number, col: number) {
     if (validation.status !== 'ongoing') return;
 
     aiThinking.value = true;
-    const aiResponse = await requestAiMove(board.value, moveHistory.value, modelConfig, aiSettings);
-    const aiMove: Move = { row: aiResponse.row, col: aiResponse.col, player: 2 };
-    board.value = aiResponse.board;
-    moveHistory.value = [...moveHistory.value, aiMove];
-    lastMove.value = aiMove;
-    gameStatus.value = aiResponse.status;
-    aiReason.value = aiResponse.reason;
-    aiSource.value = aiResponse.source;
-    diagnostics.value = aiResponse.diagnostics;
+    await applyAiMove(2, modelConfig);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected request failure.';
     errorMessage.value = message;
     if (message === tokenLimitGameOverMessage) {
-      gameStarted.value = false;
-      gameStatus.value = 'waiting';
-      gameResultDialogVisible.value = false;
+      endGameForTokenLimit(message);
     }
   } finally {
     aiThinking.value = false;
@@ -153,10 +221,13 @@ async function onPlace(row: number, col: number) {
     <div class="layout-grid">
       <aside class="left-column">
         <ModelConfigPanel
+          :game-mode="gameMode"
           :model-config="modelConfig"
+          :black-model-config="blackModelConfig"
           :ai-settings="aiSettings"
           :game-started="gameStarted"
           :ai-thinking="aiThinking"
+          @mode-change="onModeChange"
           @start="startGame"
           @reset="resetGame"
         />
@@ -165,10 +236,16 @@ async function onPlace(row: number, col: number) {
           :ai-thinking="aiThinking"
           :error-message="errorMessage"
           :move-count="moveHistory.length"
+          :game-mode="gameMode"
         />
       </aside>
 
-      <GomokuBoard :board="board" :disabled="!gameStarted || aiThinking || gameStatus !== 'ongoing'" :last-move="lastMove" @place="onPlace" />
+      <GomokuBoard
+        :board="board"
+        :disabled="gameMode === 'ai_ai' || !gameStarted || aiThinking || gameStatus !== 'ongoing'"
+        :last-move="lastMove"
+        @place="onPlace"
+      />
 
       <aside class="right-column">
         <AiDiagnosticsPanel :reason="aiReason" :source="aiSource" :diagnostics="diagnostics" />
@@ -179,7 +256,7 @@ async function onPlace(row: number, col: number) {
     <div v-if="gameResultDialogVisible" class="result-dialog-backdrop" role="presentation">
       <section class="result-dialog" role="dialog" aria-modal="true" aria-labelledby="result-dialog-title">
         <h2 id="result-dialog-title">{{ gameResultMessage }}</h2>
-        <button class="primary-button result-dialog-button" type="button" @click="gameResultDialogVisible = false">确定</button>
+        <button class="primary-button result-dialog-button" type="button" @click="gameResultDialogVisible = false">Confirm</button>
       </section>
     </div>
   </main>

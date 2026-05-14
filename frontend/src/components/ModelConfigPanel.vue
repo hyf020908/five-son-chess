@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import type { AiSettings, ModelConfig } from '../types/game';
+import type { AiSettings, GameMode, ModelConfig } from '../types/game';
 
 defineProps<{
+  gameMode: GameMode;
   modelConfig: ModelConfig;
+  blackModelConfig: ModelConfig;
   aiSettings: AiSettings;
   gameStarted: boolean;
   aiThinking: boolean;
 }>();
 
 const emit = defineEmits<{
+  modeChange: [mode: GameMode];
   start: [];
   reset: [];
 }>();
@@ -21,20 +24,62 @@ const emit = defineEmits<{
       <h2>Match setup</h2>
     </div>
 
-    <label>
-      <span>Base URL</span>
-      <input v-model="modelConfig.base_url" placeholder="http://127.0.0.1:8000/v1" autocomplete="off" />
-    </label>
+    <div class="mode-switch" role="group" aria-label="Game mode">
+      <button
+        class="mode-option"
+        :class="{ active: gameMode === 'human_ai' }"
+        type="button"
+        :disabled="aiThinking"
+        @click="emit('modeChange', 'human_ai')"
+      >
+        Human vs AI
+      </button>
+      <button
+        class="mode-option"
+        :class="{ active: gameMode === 'ai_ai' }"
+        type="button"
+        :disabled="aiThinking"
+        @click="emit('modeChange', 'ai_ai')"
+      >
+        AI vs AI
+      </button>
+    </div>
 
-    <label>
-      <span>API key</span>
-      <input v-model="modelConfig.api_key" type="password" placeholder="sk-..." autocomplete="off" />
-    </label>
+    <div v-if="gameMode === 'ai_ai'" class="model-group">
+      <h3>Black model</h3>
+      <label>
+        <span>Base URL</span>
+        <input v-model="blackModelConfig.base_url" placeholder="http://127.0.0.1:8000/v1" autocomplete="off" />
+      </label>
 
-    <label>
-      <span>Model name</span>
-      <input v-model="modelConfig.model_name" placeholder="gpt-4.1-mini or local-model" autocomplete="off" />
-    </label>
+      <label>
+        <span>API key</span>
+        <input v-model="blackModelConfig.api_key" type="password" placeholder="sk-..." autocomplete="off" />
+      </label>
+
+      <label>
+        <span>Model name</span>
+        <input v-model="blackModelConfig.model_name" placeholder="black-model" autocomplete="off" />
+      </label>
+    </div>
+
+    <div class="model-group">
+      <h3>{{ gameMode === 'ai_ai' ? 'White model' : 'AI model' }}</h3>
+      <label>
+        <span>Base URL</span>
+        <input v-model="modelConfig.base_url" placeholder="http://127.0.0.1:8000/v1" autocomplete="off" />
+      </label>
+
+      <label>
+        <span>API key</span>
+        <input v-model="modelConfig.api_key" type="password" placeholder="sk-..." autocomplete="off" />
+      </label>
+
+      <label>
+        <span>Model name</span>
+        <input v-model="modelConfig.model_name" placeholder="gpt-4.1-mini or local-model" autocomplete="off" />
+      </label>
+    </div>
 
     <div class="form-grid">
       <label>
