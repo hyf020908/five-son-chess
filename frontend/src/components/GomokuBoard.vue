@@ -61,6 +61,7 @@ function place(row: number, col: number) {
         @click="place(point.row, point.col)"
       >
         <span v-if="starPoints.has(`${point.row}-${point.col}`)" class="star"></span>
+        <span v-else class="point-marker"></span>
         <span
           v-if="board[point.row][point.col] !== 0"
           class="stone"

@@ -334,6 +334,16 @@ input:focus {
   box-shadow: 0 0 16px rgba(232, 137, 255, 0.22);
 }
 
+.point-marker {
+  width: 7%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(245, 232, 255, 0.42);
+  position: absolute;
+  z-index: 3;
+  box-shadow: 0 0 6px rgba(244, 210, 255, 0.26);
+}
+
 .star {
   width: 14%;
   aspect-ratio: 1;
@@ -344,7 +354,8 @@ input:focus {
   box-shadow: 0 0 10px rgba(244, 210, 255, 0.72);
 }
 
-.intersection.occupied .star {
+.intersection.occupied .star,
+.intersection.occupied .point-marker {
   display: none;
 }
 
@@ -468,6 +479,46 @@ dd {
   background: rgba(224, 126, 255, 0.18);
   border: 1px solid rgba(238, 207, 255, 0.22);
   color: #f2d8ff;
+}
+
+.result-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(8, 2, 25, 0.56);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.result-dialog {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 22px;
+  justify-items: center;
+  padding: 34px 28px 28px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 28% 16%, rgba(255, 255, 255, 0.2), transparent 12rem),
+    linear-gradient(150deg, rgba(67, 28, 125, 0.86), rgba(26, 8, 55, 0.92));
+  box-shadow:
+    0 30px 90px rgba(5, 1, 20, 0.66),
+    0 0 46px rgba(220, 88, 255, 0.28);
+  text-align: center;
+}
+
+.result-dialog h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 4vw, 1.8rem);
+  line-height: 1.35;
+}
+
+.result-dialog-button {
+  min-width: 132px;
+  padding: 0 24px;
 }
 
 @media (max-width: 1240px) {

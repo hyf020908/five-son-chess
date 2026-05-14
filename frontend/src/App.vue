@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { requestAiMove, validateMove } from './api/client';
 import AiDiagnosticsPanel from './components/AiDiagnosticsPanel.vue';
 import GameStatusPanel from './components/GameStatusPanel.vue';
@@ -24,6 +24,7 @@ const aiSource = ref('');
 const diagnostics = ref<Diagnostics | null>(null);
 const errorMessage = ref('');
 const gameStarted = ref(false);
+const gameResultDialogVisible = ref(false);
 
 const modelConfig = reactive<ModelConfig>({
   base_url: 'http://127.0.0.1:11434/v1',
@@ -37,6 +38,17 @@ const aiSettings = reactive<AiSettings>({
   retry_count: 2,
 });
 
+const gameResultMessage = computed(() => {
+  if (gameStatus.value === 'black_win') return '✅恭喜你，赢得比赛！';
+  if (gameStatus.value === 'white_win') return '😧再接再厉！下次加油！';
+  if (gameStatus.value === 'draw') return '♟️平局';
+  return '';
+});
+
+watch(gameStatus, (status) => {
+  gameResultDialogVisible.value = ['black_win', 'white_win', 'draw'].includes(status);
+});
+
 function resetGame() {
   board.value = createBoard();
   moveHistory.value = [];
@@ -47,6 +59,7 @@ function resetGame() {
   aiSource.value = '';
   diagnostics.value = null;
   errorMessage.value = '';
+  gameResultDialogVisible.value = false;
 }
 
 function validateConfig(): boolean {
@@ -150,6 +163,13 @@ async function onPlace(row: number, col: number) {
         <AiDiagnosticsPanel :reason="aiReason" :source="aiSource" :diagnostics="diagnostics" />
         <MoveHistory :moves="moveHistory" />
       </aside>
+    </div>
+
+    <div v-if="gameResultDialogVisible" class="result-dialog-backdrop" role="presentation">
+      <section class="result-dialog" role="dialog" aria-modal="true" aria-labelledby="result-dialog-title">
+        <h2 id="result-dialog-title">{{ gameResultMessage }}</h2>
+        <button class="primary-button result-dialog-button" type="button" @click="gameResultDialogVisible = false">确定</button>
+      </section>
     </div>
   </main>
 </template>
